@@ -1,0 +1,30 @@
+# dnie-pkcs11-tester
+
+This program is just a lttle PKCS#11 tester for the DNIe (Spanish eID). It is intended to be used with the pkcs11 library provided by Opensc.
+
+The auto-tools can be used for compilng it. You need the the PKCS#11 library provided by OpenSC (or another one if you are testing another implementation) and openssl installed in your machine.
+
+    autoreconf -iv
+    ./configure --with-pkcs11=/path/to/pkcs/pkcs11.so
+    make
+
+This creates a _dnie-pkcs11-tester_ in the current directory you can execute.
+
+If you want you can compile by yourself (maybe it is easier) just execute a command like this:
+
+  gcc -I. dnie-pkcs11-tester.c -o dnie-pkcs11-tester -Wl,-rpath=/path/to/pkcs /path/to/pkcs/pkcs11.so
+
+The _rpath_ is important to fix that pkcs11 library to the resulting binary (you can also use LD_PRELOAD if you do not want to use rpath).
+
+Finally the current status of the tests which are executed is the following:
+
+    -l Login test: Test the login into the DNIe.
+    -o List objects test: Lists all objects in DNIe and try to 
+       find the required ones (certificate, private and public 
+       key for the siging and authentication keys)
+    -s Sign test: Performs a signature and a verification with the sign keys.
+    -t Auth test: Performs a signature and a verification with the authentication keys.
+    -i Interference test: Exeutes two processes in that way that one steals the
+       secure channel of the other after the login (some sleeps are used for that).
+       This test is 60 seconds in length.
+    -a All tests: Performs all the tests one by one.

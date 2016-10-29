@@ -31,3 +31,4 @@ stamp-h1
 *.lo
 *.gcno
 *.gcda
+dnie-pkcs11-tester
