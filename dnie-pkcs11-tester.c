@@ -1,3 +1,20 @@
+/*
+ * Copyright (c) 2016 ricky <https://github.com/rickyepoderi/dnie-pkcs11-tester>
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <pkcs11.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,7 +128,6 @@ char* log_pkcs11_error_name(CK_RV rv) {
     case CKR_PIN_LOCKED: return "CKR_PIN_LOCKED";
     case CKR_SESSION_CLOSED: return "CKR_SESSION_CLOSED";
     case CKR_SESSION_COUNT: return "CKR_SESSION_COUNT";
-    //case CKR_SESSION_EXCLUSIVE_EXISTS: return "CKR_SESSION_EXCLUSIVE_EXISTS";
     case CKR_SESSION_HANDLE_INVALID: return "CKR_SESSION_HANDLE_INVALID";
     case CKR_SESSION_PARALLEL_NOT_SUPPORTED: return "CKR_SESSION_PARALLEL_NOT_SUPPORTED";
     case CKR_SESSION_READ_ONLY: return "CKR_SESSION_READ_ONLY";
@@ -151,9 +167,8 @@ char* log_pkcs11_error_name(CK_RV rv) {
     case CKR_MUTEX_BAD: return "CKR_MUTEX_BAD";
     case CKR_MUTEX_NOT_LOCKED: return "CKR_MUTEX_NOT_LOCKED";
     case CKR_VENDOR_DEFINED: return "CKR_VENDOR_DEFINED";
-    //case CKR_INSERTION_CALLBACK_NOT_SUPPORTED: return "CKR_INSERTION_CALLBACK_NOT_SUPPORTED";
     default:
-      return "not a CKR error";
+      return "Unknown CKR error";
   }
 }
 
@@ -416,9 +431,9 @@ int check_sign_internal(char* password, char* priv_label, char* pub_label,
 
   information(print_pid, "Starting check_sign with %s...", priv_label);
   if (sleep_start > 0) {
-    message(print_pid, "  Sleeping %d seconds before start", sleep_start);
+    message(print_pid, "  Sleeping %d seconds before login and sign process", sleep_start);
     sleep(sleep_start);
-    message(print_pid, "  Starting the sign process");
+    message(print_pid, "  Starting the login and sign process");
   }
 
   CHECK_RV(C_Initialize(NULL_PTR), "C_Initialize");
@@ -428,7 +443,7 @@ int check_sign_internal(char* password, char* priv_label, char* pub_label,
   CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
 
   if (sleep_sign > 0) {
-    message(print_pid, "  Sleeping %d seconds before sign process", sleep_sign);
+    message(print_pid, "  Sleeping %d seconds after login and before sign process", sleep_sign);
     sleep(sleep_sign);
     message(print_pid, "  Starting the sign process");
   }
