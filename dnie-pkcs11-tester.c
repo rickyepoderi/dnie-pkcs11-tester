@@ -370,7 +370,7 @@ int check_objects(char* password) {
       found_sign_priv = 1;
     } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PUBLIC_KEY &&
         strcmp("CertAutenticacion", (char*)values[0].pValue) == 0) {
-      message(0, "  Found the signing public key");
+      message(0, "  Found the authentication public key");
       found_auth_pub = 1;
     } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PUBLIC_KEY &&
         strcmp("CertFirmaDigital", (char*)values[0].pValue) == 0) {
@@ -378,7 +378,7 @@ int check_objects(char* password) {
       found_sign_pub = 1;
     } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_CERTIFICATE &&
         strcmp("CertAutenticacion", (char*)values[0].pValue) == 0) {
-      message(0, "  Found the signing certificate");
+      message(0, "  Found the authentication certificate");
       read_certificate_value(functions, session, vector_object[i], certificate, &certificate_len);
       found_auth_cert = 1;
     } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_CERTIFICATE &&
