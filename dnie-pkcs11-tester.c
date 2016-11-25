@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <termios.h>
+#include <getopt.h>
 #include <sys/wait.h>
 #include <openssl/x509.h>
 
@@ -402,7 +403,7 @@ int check_objects(char* password) {
   }
 }
 
-int check_sign_internal(char* password, char* priv_label, char* pub_label,
+int check_sign_internal(char* password, int times, char* priv_label, char* pub_label,
     unsigned int sleep_start, unsigned int sleep_sign, int print_pid) {
   CK_FUNCTION_LIST_PTR functions;
   CK_ULONG num_slots = 128;
@@ -448,28 +449,31 @@ int check_sign_internal(char* password, char* priv_label, char* pub_label,
     message(print_pid, "  Starting the sign process");
   }
 
-  CHECK_RV(functions->C_FindObjectsInit(session, sign_template, sizeof(sign_template)/sizeof(CK_ATTRIBUTE)), "C_FindObjectsInit");
-  CHECK_RV(functions->C_FindObjects(session, vector_object, MAX_OBJECTS, &num_objects), "C_FindObjects");
-  if (num_objects == 1) {
-    CHECK_RV(functions->C_SignInit(session, &mechanism, vector_object[0]), "C_SignInit");
-    CHECK_RV(functions->C_Sign(session, data, strlen(data) + 1, signature, &signature_len), "C_Sign");
-    message(print_pid, "  Signature done successfully");
-  } else {
-    error(print_pid, "No private key found");
-  }
-  CHECK_RV(functions->C_FindObjectsFinal(session), "C_FindObjectsFinal");
+  for (int i = 0; i < times; i++) {
+    CHECK_RV(functions->C_FindObjectsInit(session, sign_template, sizeof(sign_template)/sizeof(CK_ATTRIBUTE)), "C_FindObjectsInit");
+    CHECK_RV(functions->C_FindObjects(session, vector_object, MAX_OBJECTS, &num_objects), "C_FindObjects");
 
-  CHECK_RV(functions->C_FindObjectsInit(session, ver_template, sizeof(ver_template)/sizeof(CK_ATTRIBUTE)), "C_FindObjectsInit");
-  CHECK_RV(functions->C_FindObjects(session, vector_object, MAX_OBJECTS, &num_objects), "C_FindObjects");
-  if (num_objects == 1) {
-    CHECK_RV(functions->C_VerifyInit(session, &mechanism, vector_object[0]), "C_VerifySignInit");
-    CHECK_RV(functions->C_Verify(session, data, strlen(data) + 1, signature, signature_len), "C_Verify");
-    message(print_pid, "  Verification done successfully");
-    ok = 1;
-  } else {
-    error(print_pid, "No public key found");
+    if (num_objects == 1) {
+      CHECK_RV(functions->C_SignInit(session, &mechanism, vector_object[0]), "C_SignInit");
+      CHECK_RV(functions->C_Sign(session, data, strlen(data) + 1, signature, &signature_len), "C_Sign");
+      message(print_pid, "  Signature done successfully");
+    } else {
+      error(print_pid, "No private key found");
+    }
+    CHECK_RV(functions->C_FindObjectsFinal(session), "C_FindObjectsFinal");
+
+    CHECK_RV(functions->C_FindObjectsInit(session, ver_template, sizeof(ver_template)/sizeof(CK_ATTRIBUTE)), "C_FindObjectsInit");
+    CHECK_RV(functions->C_FindObjects(session, vector_object, MAX_OBJECTS, &num_objects), "C_FindObjects");
+    if (num_objects == 1) {
+      CHECK_RV(functions->C_VerifyInit(session, &mechanism, vector_object[0]), "C_VerifySignInit");
+      CHECK_RV(functions->C_Verify(session, data, strlen(data) + 1, signature, signature_len), "C_Verify");
+      message(print_pid, "  Verification done successfully");
+      ok = 1;
+    } else {
+      error(print_pid, "No public key found");
+    }
+    CHECK_RV(functions->C_FindObjectsFinal(session), "C_FindObjectsFinal");
   }
-  CHECK_RV(functions->C_FindObjectsFinal(session), "C_FindObjectsFinal");
 
   CHECK_RV(functions->C_Logout(session), "C_Logout");
   CHECK_RV(functions->C_CloseSession(session), "C_CloseSession");
@@ -482,12 +486,12 @@ int check_sign_internal(char* password, char* priv_label, char* pub_label,
   }
 }
 
-int check_sign(char* password) {
-  return check_sign_internal(password, "KprivFirmaDigital", "CertFirmaDigital", 0, 0, 0);
+int check_sign(char* password, int times) {
+  return check_sign_internal(password, times, "KprivFirmaDigital", "CertFirmaDigital", 0, 0, 0);
 }
 
-int check_auth(char* password) {
-  return check_sign_internal(password, "KprivAutenticacion", "CertAutenticacion", 0, 0, 0);
+int check_auth(char* password, int times) {
+  return check_sign_internal(password, times, "KprivAutenticacion", "CertAutenticacion", 0, 0, 0);
 }
 
 /* No DNIe object can encrypt/decrypt
@@ -589,10 +593,10 @@ int check_process_interference(char* password) {
   pid = fork();
   if (pid == 0) {
     // child starts immediately but waits between login and sign
-    exit(check_sign_internal(password, "KprivAutenticacion", "CertAutenticacion", 0, 60, 1));
+    exit(check_sign_internal(password, 1, "KprivAutenticacion", "CertAutenticacion", 0, 60, 1));
   } else {
     // parent sleeps before start and then steals the session to the parent
-    check_sign_internal(password, "KprivAutenticacion", "CertAutenticacion", 30, 0, 1);
+    check_sign_internal(password, 1, "KprivAutenticacion", "CertAutenticacion", 30, 0, 1);
   }
   // only parent gets here
   waitpid(pid, &return_status, 0);
@@ -610,12 +614,14 @@ void usage(const char* format, ...) {
   va_end(arglist);
   message(0, "  Usage: dnie-pkcs11-tester {OPTIONS}");
   message(0, "  OPTIONS");
-  message(0, "    -a All tests");
-  message(0, "    -i Interference test");
-  message(0, "    -l Login test");
-  message(0, "    -o List objects test");
-  message(0, "    -s Sign test");
-  message(0, "    -t Auth test");
+  message(0, "    --all -a: All tests");
+  message(0, "    --inter -i: Interference test");
+  message(0, "    --list -l: Login test");
+  message(0, "    --objects -o: List objects test");
+  message(0, "    --sign -s: Sign test");
+  message(0, "    --auth -t: Auth test");
+  message(0, "    --times=NUM -m NUM: Times the sign and auth operation are repeated");
+  message(0, "                        (default NUM=1)");
   exit(1);
 }
 
@@ -624,14 +630,30 @@ void usage(const char* format, ...) {
 int main(int argc, char *argv[]) {
   char password[128];
   int c;
+  char* endptr;
   int all_flag = 0, login_flag = 0, objects_flag = 0, 
-    sign_flag = 0, auth_flag = 0, inter_flag = 0;
+    sign_flag = 0, auth_flag = 0, inter_flag = 0, times = 1;
+  static struct option long_options[] = {
+    {"all", no_argument, 0, 'a'},
+    {"inter", no_argument, 0, 'i'},
+    {"list", no_argument, 0, 'l'},
+    {"times", required_argument, 0, 'm'},
+    {"objects", no_argument, 0, 'o'},
+    {"sign", no_argument, 0, 's'},
+    {"auth", no_argument, 0, 't'},
+    {0, 0, 0, 0}
+  };
 
-  while ((c = getopt (argc, argv, "ailost")) != -1) {
+  while ((c = getopt_long(argc, argv, "ailm:ost", long_options, NULL)) != -1) {
     switch (c) {
       case 'a': all_flag = 1; break;
       case 'i': inter_flag = 1; break;
       case 'l': login_flag = 1; break;
+      case 'm': times = strtoul(optarg, &endptr, 10);
+                if (*endptr != '\0') {
+                  usage("Invalid option times");
+                }
+                break;
       case 'o': objects_flag = 1; break;
       case 's': sign_flag = 1; break;
       case 't': auth_flag = 1; break;
@@ -642,6 +664,9 @@ int main(int argc, char *argv[]) {
   if (!all_flag && !login_flag && !objects_flag && !sign_flag && !auth_flag && !inter_flag) {
     usage("One option is compulsory");
   } 
+  if (optind < argc) {
+    usage("");
+  }
 
   request_password(password, 128);
 
@@ -653,10 +678,10 @@ int main(int argc, char *argv[]) {
     RUN_CHECK(check_objects(password));
   }
   if (all_flag || sign_flag) {
-    RUN_CHECK(check_sign(password));
+    RUN_CHECK(check_sign(password, times));
   }
   if (all_flag || auth_flag) {
-    RUN_CHECK(check_auth(password));
+    RUN_CHECK(check_auth(password, times));
   }
   if (all_flag || inter_flag) {
     RUN_CHECK(check_process_interference(password));

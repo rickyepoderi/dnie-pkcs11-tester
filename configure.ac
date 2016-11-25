@@ -27,7 +27,7 @@ AC_SUBST([PKCS11LIB])
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([stdlib.h string.h termios.h unistd.h stdio.h])
+AC_CHECK_HEADERS([stdlib.h string.h termios.h unistd.h stdio.h stdarg.h getopt.h sys/wait.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
@@ -35,7 +35,7 @@ AC_CHECK_HEADER_STDBOOL
 # Checks for library functions.
 AC_FUNC_ERROR_AT_LINE
 AC_FUNC_FORK
-AC_CHECK_FUNCS([strstr])
+AC_CHECK_FUNCS([strstr strtoul])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
