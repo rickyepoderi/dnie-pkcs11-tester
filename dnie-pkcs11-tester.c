@@ -304,6 +304,15 @@ int check_login(char* password) {
 #define MAX_OBJECTS 128
 #define MAX_BUFFER_SIZE 2048
 
+int read_private_always_authenticate(CK_FUNCTION_LIST_PTR functions, CK_SESSION_HANDLE session, CK_OBJECT_HANDLE object) {
+  CK_BBOOL always_auth = FALSE;
+  CK_ATTRIBUTE values[] = {
+    {CKA_ALWAYS_AUTHENTICATE, &always_auth, sizeof(CK_BBOOL)},
+  };
+  CHECK_RV(functions->C_GetAttributeValue(session, object, values, 1), "C_GetAttributeValue");
+  return always_auth;
+}
+
 int read_certificate_value(CK_FUNCTION_LIST_PTR functions, CK_SESSION_HANDLE session, CK_OBJECT_HANDLE object,
     CK_BYTE* buffer, CK_ULONG_PTR buffer_len) {
   CK_ATTRIBUTE values[] = {
@@ -363,11 +372,13 @@ int check_objects(char* password) {
       class_to_string(*((CK_OBJECT_CLASS*) values[1].pValue)));
     if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PRIVATE_KEY &&
         strcmp("KprivAutenticacion", (char*)values[0].pValue) == 0) {
-      message(0, "  Found the authentication private key");
+      message(0, "  Found the authentication private key CKA_ALWAYS_AUTHENTICATE=%d",
+        read_private_always_authenticate(functions, session, vector_object[i]));
       found_auth_priv = 1;
     } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PRIVATE_KEY &&
         strcmp("KprivFirmaDigital", (char*)values[0].pValue) == 0) {
-      message(0, "  Found the signing private key");
+      message(0, "  Found the signing private key CKA_ALWAYS_AUTHENTICATE=%d",
+        read_private_always_authenticate(functions, session, vector_object[i]));
       found_sign_priv = 1;
     } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PUBLIC_KEY &&
         strcmp("CertAutenticacion", (char*)values[0].pValue) == 0) {
