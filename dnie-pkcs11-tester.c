@@ -440,6 +440,7 @@ int check_sign_internal(char* password, int times, char* priv_label, char* pub_l
     {CKA_LABEL, pub_label, strlen(pub_label)},
   };
   int ok = 0;
+  int always_auth_key = -1;
 
   information(print_pid, "Starting check_sign with %s...", priv_label);
   if (sleep_start > 0) {
@@ -465,9 +466,17 @@ int check_sign_internal(char* password, int times, char* priv_label, char* pub_l
     CHECK_RV(functions->C_FindObjects(session, vector_object, MAX_OBJECTS, &num_objects), "C_FindObjects");
 
     if (num_objects == 1) {
+      if (always_auth_key == -1) {
+        always_auth_key = read_private_always_authenticate(functions, session, vector_object[0]);
+      }
+      if (always_auth_key && i > 0) {
+        message(print_pid, "  Login again cos the key is CKA_ALWAYS_AUTHENTICATE");
+        CHECK_RV(functions->C_Logout(session), "C_Logout");
+        CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
+      }
       CHECK_RV(functions->C_SignInit(session, &mechanism, vector_object[0]), "C_SignInit");
       CHECK_RV(functions->C_Sign(session, data, strlen(data) + 1, signature, &signature_len), "C_Sign");
-      message(print_pid, "  Signature done successfully");
+      message(print_pid, "  Signature %d done successfully", i + 1);
     } else {
       error(print_pid, "No private key found");
     }
@@ -478,7 +487,7 @@ int check_sign_internal(char* password, int times, char* priv_label, char* pub_l
     if (num_objects == 1) {
       CHECK_RV(functions->C_VerifyInit(session, &mechanism, vector_object[0]), "C_VerifySignInit");
       CHECK_RV(functions->C_Verify(session, data, strlen(data) + 1, signature, signature_len), "C_Verify");
-      message(print_pid, "  Verification done successfully");
+      message(print_pid, "  Verification %d done successfully", i + 1);
       ok = 1;
     } else {
       error(print_pid, "No public key found");
@@ -625,14 +634,19 @@ void usage(const char* format, ...) {
   va_end(arglist);
   message(0, "  Usage: dnie-pkcs11-tester {OPTIONS}");
   message(0, "  OPTIONS");
-  message(0, "    --all -a: All tests");
-  message(0, "    --inter -i: Interference test");
-  message(0, "    --list -l: Login test");
-  message(0, "    --objects -o: List objects test");
-  message(0, "    --sign -s: Sign test");
-  message(0, "    --auth -t: Auth test");
-  message(0, "    --times=NUM -m NUM: Times the sign and auth operation are repeated");
-  message(0, "                        (default NUM=1)");
+  message(0, "    --list -l: Login test (test the into the DNIe)");
+  message(0, "    --objects -o: List objects test (lists all objects in DNIe and try to");
+  message(0, "      find the required ones (certificate, private and public key for");
+  message(0, "      for the siging and authentication keys)");
+  message(0, "    --sign -s: Sign test (performs a signature and a verification with the sign keys)");
+  message(0, "    --auth -t: Auth test (performs a signature and a verification with the authentication keys)");
+  message(0, "    --inter -i: Interference test (executes two processes in that way that one steals the");
+  message(0, "      secure channel of the other after the login, some sleeps are used for that,");
+  message(0, "      this test is 60 seconds in length)");
+  message(0, "    --all -a: All tests (performs all the tests one by one)");
+  message(0, "    --times=NUM -m NUM: Times the sign and auth operation are repeated,");
+  message(0, "      if the key is marked as CKA_ALWAYS_AUTHENTICATE the login is");
+  message(0, "      re-executed but it is used the same session if not (default NUM=2)");
   exit(1);
 }
 
@@ -643,7 +657,7 @@ int main(int argc, char *argv[]) {
   int c;
   char* endptr;
   int all_flag = 0, login_flag = 0, objects_flag = 0, 
-    sign_flag = 0, auth_flag = 0, inter_flag = 0, times = 1;
+    sign_flag = 0, auth_flag = 0, inter_flag = 0, times = 2;
   static struct option long_options[] = {
     {"all", no_argument, 0, 'a'},
     {"inter", no_argument, 0, 'i'},

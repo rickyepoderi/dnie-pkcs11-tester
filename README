@@ -19,13 +19,17 @@ The _rpath_ is important to fix that pkcs11 library to the resulting binary (you
 
 Finally the current status of the tests which are executed is the following:
 
-    -l Login test: Test the login into the DNIe.
-    -o List objects test: Lists all objects in DNIe and try to 
-       find the required ones (certificate, private and public 
-       key for the siging and authentication keys)
-    -s Sign test: Performs a signature and a verification with the sign keys.
-    -t Auth test: Performs a signature and a verification with the authentication keys.
-    -i Interference test: Exeutes two processes in that way that one steals the
-       secure channel of the other after the login (some sleeps are used for that).
-       This test is 60 seconds in length.
-    -a All tests: Performs all the tests one by one.
+    --list -l: Login test (test the into the DNIe)
+    --objects -o: List objects test (lists all objects in DNIe and try to
+      find the required ones (certificate, private and public key for
+      for the siging and authentication keys)
+    --sign -s: Sign test (performs a signature and a verification with the sign keys)
+    --auth -t: Auth test (performs a signature and a verification with the authentication keys)
+    --inter -i: Interference test (executes two processes in that way that one steals the
+      secure channel of the other after the login, some sleeps are used for that,
+      this test is 60 seconds in length)
+    --all -a: All tests (performs all the tests one by one)
+    --times=NUM -m NUM: Times the sign and auth operation are repeated,
+      if the key is marked as CKA_ALWAYS_AUTHENTICATE the login is
+      re-executed but it is used the same session if not (default NUM=2)
+
