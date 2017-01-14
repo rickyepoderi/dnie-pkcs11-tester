@@ -231,6 +231,7 @@ void request_password(char* password, int password_len) {
 /* GLOVAL VARS */
 
 int slot = -1;
+int use_cert_names = 1;
 
 int check_dnie_inserted() {
   CK_FUNCTION_LIST_PTR functions;
@@ -258,8 +259,13 @@ int check_dnie_inserted() {
     message(0, "  Found slot: %d - \"%s\"", i, info_slot.slotDescription);
     CHECK_RV(functions->C_GetTokenInfo(slots[i], &info_token), "C_GetTokenInfo");
     message(0, "  Found token: \"%s\"", info_token.label);
-    if (strstr(info_token.label, "DNI electrónico") != NULL) {
+    if (strstr(info_token.label, "(DNI electrónico)") != NULL) {
       slot = i;
+      use_cert_names = 1;
+      break;
+    } else if (strstr(info_token.label, "DNI electrónico") != NULL) {
+      slot = i;
+      use_cert_names = 0;
       break;
     }
   }
@@ -306,10 +312,16 @@ int check_login(char* password) {
 
 int read_private_always_authenticate(CK_FUNCTION_LIST_PTR functions, CK_SESSION_HANDLE session, CK_OBJECT_HANDLE object) {
   CK_BBOOL always_auth = FALSE;
+  CK_RV res;
   CK_ATTRIBUTE values[] = {
     {CKA_ALWAYS_AUTHENTICATE, &always_auth, sizeof(CK_BBOOL)},
   };
-  CHECK_RV(functions->C_GetAttributeValue(session, object, values, 1), "C_GetAttributeValue");
+  res = functions->C_GetAttributeValue(session, object, values, 1);
+  if (res == CKR_ATTRIBUTE_TYPE_INVALID) {
+    // the library does not understand CKA_ALWAYS_AUTHENTICATE => return 0
+    return 0;
+  }
+  CHECK_RV(res, "C_GetAttributeValue");
   return always_auth;
 }
 
@@ -381,11 +393,13 @@ int check_objects(char* password) {
         read_private_always_authenticate(functions, session, vector_object[i]));
       found_sign_priv = 1;
     } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PUBLIC_KEY &&
-        strcmp("CertAutenticacion", (char*)values[0].pValue) == 0) {
+        (strcmp("CertAutenticacion", (char*)values[0].pValue) == 0 ||
+         strcmp("KpuAutenticacion", (char*)values[0].pValue) == 0)) {
       message(0, "  Found the authentication public key");
       found_auth_pub = 1;
     } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PUBLIC_KEY &&
-        strcmp("CertFirmaDigital", (char*)values[0].pValue) == 0) {
+        (strcmp("CertFirmaDigital", (char*)values[0].pValue) == 0 ||
+         strcmp("KpuFirmaDigital", (char*)values[0].pValue) == 0)) {
       message(0, "  Found the signing public key");
       found_sign_pub = 1;
     } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_CERTIFICATE &&
@@ -507,11 +521,15 @@ int check_sign_internal(char* password, int times, char* priv_label, char* pub_l
 }
 
 int check_sign(char* password, int times) {
-  return check_sign_internal(password, times, "KprivFirmaDigital", "CertFirmaDigital", 0, 0, 0);
+  return check_sign_internal(password, times, 
+    "KprivFirmaDigital", use_cert_names? "CertFirmaDigital" : "KpuFirmaDigital", 
+    0, 0, 0);
 }
 
 int check_auth(char* password, int times) {
-  return check_sign_internal(password, times, "KprivAutenticacion", "CertAutenticacion", 0, 0, 0);
+  return check_sign_internal(password, times, 
+    "KprivAutenticacion", use_cert_names? "CertAutenticacion" : "KpuAutenticacion", 
+    0, 0, 0);
 }
 
 /* No DNIe object can encrypt/decrypt
@@ -613,10 +631,12 @@ int check_process_interference(char* password) {
   pid = fork();
   if (pid == 0) {
     // child starts immediately but waits between login and sign
-    exit(check_sign_internal(password, 1, "KprivAutenticacion", "CertAutenticacion", 0, 60, 1));
+    exit(check_sign_internal(password, 1, "KprivAutenticacion", 
+      use_cert_names? "CertAutenticacion" : "KpuAutenticacion", 0, 60, 1));
   } else {
     // parent sleeps before start and then steals the session to the parent
-    check_sign_internal(password, 1, "KprivAutenticacion", "CertAutenticacion", 30, 0, 1);
+    check_sign_internal(password, 1, "KprivAutenticacion", 
+      use_cert_names? "CertAutenticacion" : "KpuAutenticacion", 30, 0, 1);
   }
   // only parent gets here
   waitpid(pid, &return_status, 0);
