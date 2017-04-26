@@ -31,6 +31,20 @@
 #define KGRN  "\x1B[32m"
 #define KNRM  "\x1B[0m"
 
+/* TEST STRUCT */
+
+typedef struct {
+  char *name;
+  char *description;
+  uint8_t is_default;
+  int (*test)(char *password);
+} dnie_test;
+
+/* GLOVAL VARS */
+
+int slot = -1;
+int use_cert_names = 1;
+
 /* HELPER FUNCTIONS */
 
 void error(int print_pid, const char *format, ...) {
@@ -228,19 +242,16 @@ void request_password(char* password, int password_len) {
   }
 }
 
-/* GLOVAL VARS */
+/* TESTS */
 
-int slot = -1;
-int use_cert_names = 1;
-
-int check_dnie_inserted() {
+int test_dnie_inserted(char *password) {
   CK_FUNCTION_LIST_PTR functions;
   CK_ULONG num_slots = 0;
   CK_SLOT_INFO info_slot;
   CK_SLOT_ID slots[128];
   CK_TOKEN_INFO info_token;
 
-  information(0, "Starting check_dnie_inserted...", "ssd");
+  information(0, "Starting test_dnie_inserted...", "ssd");
   CHECK_RV(C_Initialize(NULL_PTR), "C_Initialize");
   CHECK_RV(C_GetFunctionList(&functions), "C_GetFunctionList");
   CHECK_RV(functions->C_GetSlotList(TRUE, NULL_PTR, &num_slots), "C_GetSlotList");
@@ -279,14 +290,14 @@ int check_dnie_inserted() {
   }
 }
 
-int check_login(char* password) {
+int test_login(char* password) {
   CK_FUNCTION_LIST_PTR functions;
   CK_ULONG num_slots = 128;
   CK_SLOT_ID slots[128];
   CK_SESSION_HANDLE session;
   CK_SESSION_INFO info_session;
 
-  information(0, "Starting check_login...", "ssd");
+  information(0, "Starting test_login...", "ssd");
   CHECK_RV(C_Initialize(NULL_PTR), "C_Initialize");
   CHECK_RV(C_GetFunctionList(&functions), "C_GetFunctionList");
   CHECK_RV(functions->C_GetSlotList(TRUE, slots, &num_slots), "C_GetSlotList");
@@ -301,6 +312,44 @@ int check_login(char* password) {
   C_Finalize(NULL_PTR);
   if (info_session.state == CKS_RW_USER_FUNCTIONS) {
     information(0, "login OK");
+  } else {
+    error(0, "Invalid session state");
+  }
+  return 0;
+}
+
+int test_logout(char* password) {
+  CK_FUNCTION_LIST_PTR functions;
+  CK_ULONG num_slots = 128;
+  CK_SLOT_ID slots[128];
+  CK_SESSION_HANDLE session;
+  CK_SESSION_INFO info_session;
+
+  information(0, "Starting test_logout...", "ssd");
+  CHECK_RV(C_Initialize(NULL_PTR), "C_Initialize");
+  CHECK_RV(C_GetFunctionList(&functions), "C_GetFunctionList");
+  CHECK_RV(functions->C_GetSlotList(TRUE, slots, &num_slots), "C_GetSlotList");
+  CHECK_RV(functions->C_OpenSession(slots[slot], CKF_RW_SESSION|CKF_SERIAL_SESSION, NULL_PTR, (CK_NOTIFY) NULL_PTR, &session), "C_OpenSession");
+  CHECK_RV(functions->C_GetSessionInfo(session, &info_session), "C_GetSessionInfo");
+  message(0, "  Session status: %s", log_session_info_state(info_session.state));
+  CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
+  CHECK_RV(functions->C_GetSessionInfo(session, &info_session), "C_GetSessionInfo");
+  message(0, "  Session status: %s", log_session_info_state(info_session.state));
+  CHECK_RV(functions->C_Logout(session), "C_Logout");
+  CHECK_RV(functions->C_CloseSession(session), "C_CloseSession");
+
+  CHECK_RV(functions->C_OpenSession(slots[slot], CKF_RW_SESSION|CKF_SERIAL_SESSION, NULL_PTR, (CK_NOTIFY) NULL_PTR, &session), "C_OpenSession");
+  CHECK_RV(functions->C_GetSessionInfo(session, &info_session), "C_GetSessionInfo");
+  message(0, "  Session status: %s", log_session_info_state(info_session.state));
+  CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
+  CHECK_RV(functions->C_GetSessionInfo(session, &info_session), "C_GetSessionInfo");
+  message(0, "  Session status: %s", log_session_info_state(info_session.state));
+  CHECK_RV(functions->C_Logout(session), "C_Logout");
+  CHECK_RV(functions->C_CloseSession(session), "C_CloseSession");
+
+  C_Finalize(NULL_PTR);
+  if (info_session.state == CKS_RW_USER_FUNCTIONS) {
+    information(0, "logout OK");
   } else {
     error(0, "Invalid session state");
   }
@@ -344,7 +393,7 @@ int read_certificate_value(CK_FUNCTION_LIST_PTR functions, CK_SESSION_HANDLE ses
   X509_free(x509);
 }
 
-int check_objects(char* password) {
+int test_objects(char* password) {
   CK_FUNCTION_LIST_PTR functions;
   CK_ULONG num_slots = 128;
   CK_SLOT_ID slots[128];
@@ -367,7 +416,7 @@ int check_objects(char* password) {
   int found_auth_priv = 0, found_sign_priv = 0, found_auth_pub = 0, found_sign_pub = 0,
     found_auth_cert = 0, found_sign_cert = 0;
 
-  information(0, "Starting check_objects...", "ssd");
+  information(0, "Starting test_objects...", "ssd");
   CHECK_RV(C_Initialize(NULL_PTR), "C_Initialize");
   CHECK_RV(C_GetFunctionList(&functions), "C_GetFunctionList");
   CHECK_RV(functions->C_GetSlotList(TRUE, slots, &num_slots), "C_GetSlotList");
@@ -423,12 +472,12 @@ int check_objects(char* password) {
     error(0, "Some object is not found in the DNIe");
     return 1;
   } else {
-    information(0, "check_objects OK");
+    information(0, "test_objects OK");
     return 0;
   }
 }
 
-int check_sign_internal(char* password, int times, char* priv_label, char* pub_label,
+int test_sign_internal(char* password, int times, char* priv_label, char* pub_label,
     unsigned int sleep_start, unsigned int sleep_sign, int print_pid) {
   CK_FUNCTION_LIST_PTR functions;
   CK_ULONG num_slots = 128;
@@ -456,7 +505,7 @@ int check_sign_internal(char* password, int times, char* priv_label, char* pub_l
   int ok = 0;
   int always_auth_key = -1;
 
-  information(print_pid, "Starting check_sign with %s...", priv_label);
+  information(print_pid, "Starting test_sign with %s...", priv_label);
   if (sleep_start > 0) {
     message(print_pid, "  Sleeping %d seconds before login and sign process", sleep_start);
     sleep(sleep_start);
@@ -513,23 +562,35 @@ int check_sign_internal(char* password, int times, char* priv_label, char* pub_l
   CHECK_RV(functions->C_CloseSession(session), "C_CloseSession");
   C_Finalize(NULL_PTR);
   if (ok) {
-    information(print_pid, "check_sign OK");
+    information(print_pid, "test_sign OK");
     return 0;
   } else {
     return 1;
   }
 }
 
-int check_sign(char* password, int times) {
-  return check_sign_internal(password, times, 
+int test_sign(char* password, int times) {
+  return test_sign_internal(password, times, 
     "KprivFirmaDigital", use_cert_names? "CertFirmaDigital" : "KpuFirmaDigital", 
     0, 0, 0);
 }
 
-int check_auth(char* password, int times) {
-  return check_sign_internal(password, times, 
+int test_auth(char* password, int times) {
+  return test_sign_internal(password, times, 
     "KprivAutenticacion", use_cert_names? "CertAutenticacion" : "KpuAutenticacion", 
     0, 0, 0);
+}
+
+int test_sign_two(char* password) {
+  return test_sign(password, 2);
+}
+
+int test_auth_two(char* password) {
+  return test_auth(password, 2);
+}
+
+int test_auth_eleven(char* password) {
+  return test_auth(password, 11);
 }
 
 /* No DNIe object can encrypt/decrypt
@@ -560,7 +621,7 @@ int read_auth_certificate(CK_FUNCTION_LIST_PTR functions, CK_SESSION_HANDLE sess
   CHECK_RV(functions->C_FindObjectsFinal(session), "C_FindObjectsFinal");
 }
 
-int check_encrypt(char* password) {
+int test_encrypt(char* password) {
   CK_FUNCTION_LIST_PTR functions;
   CK_ULONG num_slots = 128;
   CK_SLOT_ID slots[128];
@@ -588,7 +649,7 @@ int check_encrypt(char* password) {
   CK_BYTE decrypted[MAX_BUFFER_SIZE];
   CK_ULONG decrypted_len;
 
-  information(0, "Starting check_encrypt...");
+  information(0, "Starting test_encrypt...");
   CHECK_RV(C_Initialize(NULL_PTR), "C_Initialize");
   CHECK_RV(C_GetFunctionList(&functions), "C_GetFunctionList");
   CHECK_RV(functions->C_GetSlotList(TRUE, slots, &num_slots), "C_GetSlotList");
@@ -623,51 +684,127 @@ int check_encrypt(char* password) {
 }
 */
 
-int check_process_interference(char* password) {
+int test_process_interference(char* password) {
   int return_status;
   int pid;
 
-  information(0, "Starting check_process_interference...");
+  information(0, "Starting test_process_interference...");
   pid = fork();
   if (pid == 0) {
     // child starts immediately but waits between login and sign
-    exit(check_sign_internal(password, 1, "KprivAutenticacion", 
+    exit(test_sign_internal(password, 1, "KprivAutenticacion", 
       use_cert_names? "CertAutenticacion" : "KpuAutenticacion", 0, 60, 1));
   } else {
     // parent sleeps before start and then steals the session to the parent
-    check_sign_internal(password, 1, "KprivAutenticacion", 
+    test_sign_internal(password, 1, "KprivAutenticacion", 
       use_cert_names? "CertAutenticacion" : "KpuAutenticacion", 30, 0, 1);
   }
   // only parent gets here
   waitpid(pid, &return_status, 0);
   if (return_status == 0) {
-    information(0, "check_process_interference OK");
+    information(0, "test_process_interference OK");
   }
   return return_status;
 }
+
+/* DEFINED TESTS */
+
+dnie_test tests[] = {
+  {
+    .name = "inserted",
+    .description = "Looks for the DNIe being inserted. This test is compulsory and cannot be selected.",
+    .test = test_dnie_inserted,
+    .is_default = 1,
+  },
+  {
+    .name = "login",
+    .description = "Login into the DNIe.",
+    .test = test_login,
+    .is_default = 1,
+  },
+  {
+    .name = "list-objects",
+    .description = "List all objects inside the DNIe.",
+    .test = test_objects,
+    .is_default = 1,
+  },
+  {
+    .name = "logout",
+    .description = "Test for login, logout and login again.",
+    .test = test_logout,
+    .is_default = 1,
+  },
+  {
+    .name = "signature",
+    .description = "Performs two sequential signatures with the sign key.",
+    .test = test_sign_two,
+    .is_default = 1,
+  },
+  {
+    .name = "authentication",
+    .description = "Performs two sequential signatures with the auth key.",
+    .test = test_auth_two,
+    .is_default = 1,
+  },
+  {
+    .name = "interference",
+    .description = "Executes two processes in that way that one steals the secure channel of the other after the login, some sleeps are used for that, this test is 60 seconds in length.",
+    .test = test_process_interference,
+    .is_default = 1,
+  },
+  {
+    .name = "auth-11",
+    .description = "Executes 11 signatures with the auth key. OpenSC has a default pin cache of 10 uses, DNIe v3.0 needs more.",
+    .test = test_auth_eleven,
+    .is_default = 0,
+  }
+};
+
+uint8_t tests_run[sizeof(tests) / sizeof(dnie_test)];
+
+/* USAGE */
 
 void usage(const char* format, ...) {
   va_list arglist;
 
   va_start(arglist, format);
-  error(0, format, arglist);
+  vprintf(format, arglist);
   va_end(arglist);
+  printf("%s\n", KNRM);
   message(0, "  Usage: dnie-pkcs11-tester {OPTIONS}");
-  message(0, "  OPTIONS");
-  message(0, "    --list -l: Login test (test the into the DNIe)");
-  message(0, "    --objects -o: List objects test (lists all objects in DNIe and try to");
-  message(0, "      find the required ones (certificate, private and public key for");
-  message(0, "      for the siging and authentication keys)");
-  message(0, "    --sign -s: Sign test (performs a signature and a verification with the sign keys)");
-  message(0, "    --auth -t: Auth test (performs a signature and a verification with the authentication keys)");
-  message(0, "    --inter -i: Interference test (executes two processes in that way that one steals the");
-  message(0, "      secure channel of the other after the login, some sleeps are used for that,");
-  message(0, "      this test is 60 seconds in length)");
-  message(0, "    --all -a: All tests (performs all the tests one by one)");
-  message(0, "    --times=NUM -m NUM: Times the sign and auth operation are repeated,");
-  message(0, "      if the key is marked as CKA_ALWAYS_AUTHENTICATE the login is");
-  message(0, "      re-executed but it is used the same session if not (default NUM=2)");
+  message(0, "  OPTIONS:");
+  message(0, "    --test=TEST -t TEST: Executes the test TEST (order or name of the test).");
+  message(0, "      This parameter can be used several times (several tests are run).");
+  message(0, "    --all -a: All default tests are executed.");
+  message(0, "    --help -h: Prints this usage.");
+  message(0, "  TESTS:");
+  for (int i = 1; i < sizeof(tests) / sizeof(dnie_test); i++) {
+    message(0, "    %2d.- name: %s", i, tests[i].name);
+    message(0, "         description: %s", tests[i].description);
+    message(0, "         default: %s", tests[i].is_default? "yes":"no");
+  }
   exit(1);
+}
+
+/* MAIN */
+
+void search_for_test(char* name) {
+  char *tmp;
+  int idx = strtol(name, &tmp, 10);
+  if (*tmp == '\0' && idx > 0 && idx < sizeof(tests) / sizeof(dnie_test)) {
+    // the test is specified using an index
+    tests_run[idx] = 1;
+    return;
+  } else {
+    // search using the name of the test
+    for (int idx = 1; idx < sizeof(tests) / sizeof(dnie_test); idx++) {
+      if (strncmp(tests[idx].name, name, sizeof(tests[idx].name)) == 0) {
+        tests_run[idx] = 1;
+        return;
+      }
+    }
+  }
+  usage("invalid test '%s' specified", name);
 }
 
 #define RUN_CHECK(rv) if (rv != 0) return 1
@@ -675,60 +812,32 @@ void usage(const char* format, ...) {
 int main(int argc, char *argv[]) {
   char password[128];
   int c;
-  char* endptr;
-  int all_flag = 0, login_flag = 0, objects_flag = 0, 
-    sign_flag = 0, auth_flag = 0, inter_flag = 0, times = 2;
+  int all_flag = 0;
   static struct option long_options[] = {
+    {"test", required_argument, 0, 't'},
     {"all", no_argument, 0, 'a'},
-    {"inter", no_argument, 0, 'i'},
-    {"list", no_argument, 0, 'l'},
-    {"times", required_argument, 0, 'm'},
-    {"objects", no_argument, 0, 'o'},
-    {"sign", no_argument, 0, 's'},
-    {"auth", no_argument, 0, 't'},
+    {"help", no_argument, 0, 'h'},
     {0, 0, 0, 0}
   };
 
-  while ((c = getopt_long(argc, argv, "ailm:ost", long_options, NULL)) != -1) {
+  while ((c = getopt_long(argc, argv, "aht:", long_options, NULL)) != -1) {
     switch (c) {
-      case 'a': all_flag = 1; break;
-      case 'i': inter_flag = 1; break;
-      case 'l': login_flag = 1; break;
-      case 'm': times = strtoul(optarg, &endptr, 10);
-                if (*endptr != '\0') {
-                  usage("Invalid option times");
-                }
-                break;
-      case 'o': objects_flag = 1; break;
-      case 's': sign_flag = 1; break;
-      case 't': auth_flag = 1; break;
-      case '?': usage("");
+      case 'a': 
+        all_flag = 1; 
+	break;
+      case 't': 
+        search_for_test(optarg);
+	break;
+      case 'h':
+      case '?': 
+        usage("");
     }
   }
 
-  if (!all_flag && !login_flag && !objects_flag && !sign_flag && !auth_flag && !inter_flag) {
-    usage("One option is compulsory");
-  } 
-  if (optind < argc) {
-    usage("");
-  }
-
   request_password(password, 128);
-
-  RUN_CHECK(check_dnie_inserted());
-  if (all_flag || login_flag) {
-    RUN_CHECK(check_login(password));
-  }
-  if (all_flag || objects_flag) {
-    RUN_CHECK(check_objects(password));
-  }
-  if (all_flag || sign_flag) {
-    RUN_CHECK(check_sign(password, times));
-  }
-  if (all_flag || auth_flag) {
-    RUN_CHECK(check_auth(password, times));
-  }
-  if (all_flag || inter_flag) {
-    RUN_CHECK(check_process_interference(password));
+  for (int i = 0; i < sizeof(tests) / sizeof(dnie_test); i++) {
+    if (i == 0 || tests_run[i] || (all_flag && tests[i].is_default)) {
+      tests[i].test(password);
+    }
   }
 }
