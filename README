@@ -19,17 +19,34 @@ The _rpath_ is important to fix that pkcs11 library to the resulting binary (you
 
 Finally the current status of the tests which are executed is the following:
 
-    --list -l: Login test (test the into the DNIe)
-    --objects -o: List objects test (lists all objects in DNIe and try to
-      find the required ones (certificate, private and public key for
-      for the siging and authentication keys)
-    --sign -s: Sign test (performs a signature and a verification with the sign keys)
-    --auth -t: Auth test (performs a signature and a verification with the authentication keys)
-    --inter -i: Interference test (executes two processes in that way that one steals the
-      secure channel of the other after the login, some sleeps are used for that,
-      this test is 60 seconds in length)
-    --all -a: All tests (performs all the tests one by one)
-    --times=NUM -m NUM: Times the sign and auth operation are repeated,
-      if the key is marked as CKA_ALWAYS_AUTHENTICATE the login is
-      re-executed but it is used the same session if not (default NUM=2)
+  Usage: dnie-pkcs11-tester {OPTIONS}
+
+  OPTIONS:
+    --test=TEST -t TEST: Executes the test TEST (order or name of the test).
+      This parameter can be used several times (several tests are run).
+    --all -a: All default tests are executed.
+    --help -h: Prints this usage.
+
+  TESTS:
+     1.- name: login
+         description: Login into the DNIe.
+         default: yes
+     2.- name: list-objects
+         description: List all objects inside the DNIe.
+         default: yes
+     3.- name: logout
+         description: Test for login, logout and login again.
+         default: yes
+     4.- name: signature
+         description: Performs two sequential signatures with the sign key.
+         default: yes
+     5.- name: authentication
+         description: Performs two sequential signatures with the auth key.
+         default: yes
+     6.- name: interference
+         description: Executes two processes in that way that one steals the secure channel of the other after the login, some sleeps are used for that, this test is 60 seconds in length.
+         default: yes
+     7.- name: auth-11
+         description: Executes 11 signatures with the auth key. OpenSC has a default pin cache of 10 uses, DNIe v3.0 needs more.
+         default: no
 
