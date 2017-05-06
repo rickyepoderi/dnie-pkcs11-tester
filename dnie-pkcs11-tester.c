@@ -36,7 +36,7 @@
 typedef struct {
   char *name;
   char *description;
-  uint8_t is_default;
+  unsigned char is_default;
   int (*test)(char *password);
 } dnie_test;
 
@@ -774,7 +774,7 @@ void usage(const char* format, ...) {
 
 /* MAIN */
 
-void search_for_test(uint8_t* tests_run, char* name) {
+void search_for_test(unsigned char* tests_run, char* name) {
   char *tmp;
   int idx = strtol(name, &tmp, 10);
   if (*tmp == '\0' && idx > 0 && idx < sizeof(tests) / sizeof(dnie_test)) {
@@ -809,7 +809,7 @@ int run_test(dnie_test* test, char* password) {
 
 int main(int argc, char *argv[]) {
   char password[128];
-  uint8_t tests_run[sizeof(tests) / sizeof(dnie_test)];
+  unsigned char tests_run[sizeof(tests) / sizeof(dnie_test)];
   int c, all_flag = 0;
   static struct option long_options[] = {
     {"test", required_argument, 0, 't'},
