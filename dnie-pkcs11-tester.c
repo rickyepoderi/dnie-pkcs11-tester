@@ -97,6 +97,7 @@ char* log_session_info_state(CK_STATE s) {
     case CKS_RW_PUBLIC_SESSION: return "CKS_RW_PUBLIC_SESSION";
     case CKS_RW_USER_FUNCTIONS: return "CKS_RW_USER_FUNCTIONS";
     case CKS_RW_SO_FUNCTIONS: return "CKS_RW_SO_FUNCTIONS";
+    default: return "Unkown info state";
   }
 }
 
@@ -300,11 +301,11 @@ int test_dnie_inserted(char *password) {
     message(0, "  Found slot: %d - \"%s\"", i, info_slot.slotDescription);
     CHECK_RV(functions->C_GetTokenInfo(slots[i], &info_token), "C_GetTokenInfo");
     message(0, "  Found token: \"%s\"", info_token.label);
-    if (strstr(info_token.label, "(DNI electrónico)") != NULL) {
+    if (strstr((char*) info_token.label, "(DNI electrónico)") != NULL) {
       slot = i;
       use_cert_names = 1;
       break;
-    } else if (strstr(info_token.label, "DNI electrónico") != NULL) {
+    } else if (strstr((char*) info_token.label, "DNI electrónico") != NULL) {
       slot = i;
       use_cert_names = 0;
       break;
@@ -333,7 +334,7 @@ int test_login(char* password) {
   CHECK_RV(functions->C_OpenSession(slots[slot], CKF_RW_SESSION|CKF_SERIAL_SESSION, NULL_PTR, (CK_NOTIFY) NULL_PTR, &session), "C_OpenSession");
   CHECK_RV(functions->C_GetSessionInfo(session, &info_session), "C_GetSessionInfo");
   message(0, "  Session status: %s", log_session_info_state(info_session.state));
-  CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
+  CHECK_RV(functions->C_Login(session, CKU_USER, (unsigned char*) password, strlen(password)), "C_Login");
   CHECK_RV(functions->C_GetSessionInfo(session, &info_session), "C_GetSessionInfo");
   message(0, "  Session status: %s", log_session_info_state(info_session.state));
   CHECK_RV(functions->C_Logout(session), "C_Logout");
@@ -359,7 +360,7 @@ int test_logout(char* password) {
   CHECK_RV(functions->C_OpenSession(slots[slot], CKF_RW_SESSION|CKF_SERIAL_SESSION, NULL_PTR, (CK_NOTIFY) NULL_PTR, &session), "C_OpenSession");
   CHECK_RV(functions->C_GetSessionInfo(session, &info_session), "C_GetSessionInfo");
   message(0, "  Session status: %s", log_session_info_state(info_session.state));
-  CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
+  CHECK_RV(functions->C_Login(session, CKU_USER, (unsigned char*) password, strlen(password)), "C_Login");
   CHECK_RV(functions->C_GetSessionInfo(session, &info_session), "C_GetSessionInfo");
   message(0, "  Session status: %s", log_session_info_state(info_session.state));
   CHECK_RV(functions->C_Logout(session), "C_Logout");
@@ -368,7 +369,7 @@ int test_logout(char* password) {
   CHECK_RV(functions->C_OpenSession(slots[slot], CKF_RW_SESSION|CKF_SERIAL_SESSION, NULL_PTR, (CK_NOTIFY) NULL_PTR, &session), "C_OpenSession");
   CHECK_RV(functions->C_GetSessionInfo(session, &info_session), "C_GetSessionInfo");
   message(0, "  Session status: %s", log_session_info_state(info_session.state));
-  CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
+  CHECK_RV(functions->C_Login(session, CKU_USER, (unsigned char*) password, strlen(password)), "C_Login");
   CHECK_RV(functions->C_GetSessionInfo(session, &info_session), "C_GetSessionInfo");
   message(0, "  Session status: %s", log_session_info_state(info_session.state));
   CHECK_RV(functions->C_Logout(session), "C_Logout");
@@ -388,7 +389,7 @@ int test_logout(char* password) {
 int read_private_always_authenticate(CK_FUNCTION_LIST_PTR functions, CK_SESSION_HANDLE session, CK_OBJECT_HANDLE object) {
   CK_BBOOL always_auth = FALSE;
   CK_RV res;
-  CK_ATTRIBUTE values[] = {
+  CK_ATTRIBUTE values[1] = {
     {CKA_ALWAYS_AUTHENTICATE, &always_auth, sizeof(CK_BBOOL)},
   };
   res = functions->C_GetAttributeValue(session, object, values, 1);
@@ -402,7 +403,7 @@ int read_private_always_authenticate(CK_FUNCTION_LIST_PTR functions, CK_SESSION_
 
 int read_certificate_value(CK_FUNCTION_LIST_PTR functions, CK_SESSION_HANDLE session, CK_OBJECT_HANDLE object,
     CK_BYTE* buffer, CK_ULONG_PTR buffer_len) {
-  CK_ATTRIBUTE values[] = {
+  CK_ATTRIBUTE values[1] = {
     {CKA_VALUE, buffer, *buffer_len},
   };
   X509 *x509;
@@ -417,6 +418,7 @@ int read_certificate_value(CK_FUNCTION_LIST_PTR functions, CK_SESSION_HANDLE ses
   }
   X509_print_ex(o, x509, XN_FLAG_COMPAT, X509_FLAG_COMPAT);
   X509_free(x509);
+  return 0;
 }
 
 int test_objects(char* password) {
@@ -426,13 +428,13 @@ int test_objects(char* password) {
   CK_SESSION_HANDLE session;
   CK_ULONG num_objects = MAX_OBJECTS;
   CK_BBOOL bool_true = TRUE;
-  CK_ATTRIBUTE template[] = {
+  CK_ATTRIBUTE template[1] = {
     {CKA_TOKEN, &bool_true, sizeof(CK_BBOOL)},
   };
   CK_OBJECT_HANDLE vector_object[MAX_OBJECTS];
   CK_OBJECT_CLASS class;
   char buffer[MAX_BUFFER_SIZE + 1];
-  CK_ATTRIBUTE values[] = {
+  CK_ATTRIBUTE values[2] = {
     {CKA_LABEL, buffer, MAX_BUFFER_SIZE},
     {CKA_CLASS, &class, sizeof(CK_OBJECT_CLASS)},
   };
@@ -446,7 +448,7 @@ int test_objects(char* password) {
   CHECK_RV(C_GetFunctionList_handle(&functions), "C_GetFunctionList");
   CHECK_RV(functions->C_GetSlotList(TRUE, slots, &num_slots), "C_GetSlotList");
   CHECK_RV(functions->C_OpenSession(slots[slot], CKF_RW_SESSION|CKF_SERIAL_SESSION, NULL_PTR, (CK_NOTIFY) NULL_PTR, &session), "C_OpenSession");
-  CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
+  CHECK_RV(functions->C_Login(session, CKU_USER, (unsigned char*) password, strlen(password)), "C_Login");
   CHECK_RV(functions->C_FindObjectsInit(session, template, sizeof(template)/sizeof(CK_ATTRIBUTE)), "C_FindObjectsInit");
   CHECK_RV(functions->C_FindObjects(session, vector_object, MAX_OBJECTS, &num_objects), "C_FindObjects");
   message(0, "  Found %d objects in the DNIe", num_objects);
@@ -510,18 +512,18 @@ int test_sign_internal(char* password, int times, char* priv_label, char* pub_la
   char* data = "something to sign";
   CK_BYTE signature[MAX_BUFFER_SIZE];
   CK_ULONG signature_len = MAX_BUFFER_SIZE;
-  CK_BBOOL true = TRUE;
+  CK_BBOOL bool_true = TRUE;
   CK_OBJECT_CLASS priv_class = CKO_PRIVATE_KEY;
-  CK_ATTRIBUTE sign_template[] = {
-    {CKA_TOKEN, &true, sizeof(CK_BBOOL)},
+  CK_ATTRIBUTE sign_template[3] = {
+    {CKA_TOKEN, &bool_true, sizeof(CK_BBOOL)},
     {CKA_CLASS, &priv_class, sizeof(priv_class)},
     {CKA_LABEL, priv_label, strlen(priv_label)},
   };
   CK_ULONG num_objects = MAX_OBJECTS;
   CK_OBJECT_HANDLE vector_object[MAX_OBJECTS];
   CK_OBJECT_CLASS pub_class = CKO_PUBLIC_KEY;
-  CK_ATTRIBUTE ver_template[] = {
-    {CKA_TOKEN, &true, sizeof(CK_BBOOL)},
+  CK_ATTRIBUTE ver_template[3] = {
+    {CKA_TOKEN, &bool_true, sizeof(CK_BBOOL)},
     {CKA_CLASS, &pub_class, sizeof(pub_class)},
     {CKA_LABEL, pub_label, strlen(pub_label)},
   };
@@ -539,7 +541,7 @@ int test_sign_internal(char* password, int times, char* priv_label, char* pub_la
   CHECK_RV(C_GetFunctionList_handle(&functions), "C_GetFunctionList");
   CHECK_RV(functions->C_GetSlotList(TRUE, slots, &num_slots), "C_GetSlotList");
   CHECK_RV(functions->C_OpenSession(slots[slot], CKF_RW_SESSION|CKF_SERIAL_SESSION, NULL_PTR, (CK_NOTIFY) NULL_PTR, &session), "C_OpenSession");
-  CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
+  CHECK_RV(functions->C_Login(session, CKU_USER, (unsigned char*) password, strlen(password)), "C_Login");
 
   if (sleep_sign > 0) {
     message(print_pid, "  Sleeping %d seconds after login and before sign process", sleep_sign);
@@ -558,10 +560,10 @@ int test_sign_internal(char* password, int times, char* priv_label, char* pub_la
       if (always_auth_key && i > 0) {
         message(print_pid, "  Login again cos the key is CKA_ALWAYS_AUTHENTICATE");
         CHECK_RV(functions->C_Logout(session), "C_Logout");
-        CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
+        CHECK_RV(functions->C_Login(session, CKU_USER, (unsigned char*) password, strlen(password)), "C_Login");
       }
       CHECK_RV(functions->C_SignInit(session, &mechanism, vector_object[0]), "C_SignInit");
-      CHECK_RV(functions->C_Sign(session, data, strlen(data) + 1, signature, &signature_len), "C_Sign");
+      CHECK_RV(functions->C_Sign(session, (unsigned char*) data, strlen(data) + 1, signature, &signature_len), "C_Sign");
       message(print_pid, "  Signature %d done successfully", i + 1);
     } else {
       error(print_pid, "No private key found");
@@ -572,7 +574,7 @@ int test_sign_internal(char* password, int times, char* priv_label, char* pub_la
     CHECK_RV(functions->C_FindObjects(session, vector_object, MAX_OBJECTS, &num_objects), "C_FindObjects");
     if (num_objects == 1) {
       CHECK_RV(functions->C_VerifyInit(session, &mechanism, vector_object[0]), "C_VerifySignInit");
-      CHECK_RV(functions->C_Verify(session, data, strlen(data) + 1, signature, signature_len), "C_Verify");
+      CHECK_RV(functions->C_Verify(session, (unsigned char*) data, strlen(data) + 1, signature, signature_len), "C_Verify");
       message(print_pid, "  Verification %d done successfully", i + 1);
       ok = 1;
     } else {
@@ -621,12 +623,12 @@ int read_auth_certificate(CK_FUNCTION_LIST_PTR functions, CK_SESSION_HANDLE sess
   CK_BBOOL true = TRUE;
   CK_OBJECT_CLASS pub_class = CKO_CERTIFICATE;
   CK_CHAR pub_label[] = "CertAutenticacion";
-  CK_ATTRIBUTE enc_template[] = {
+  CK_ATTRIBUTE enc_template[3] = {
     {CKA_TOKEN, &true, sizeof(CK_BBOOL)},
     {CKA_CLASS, &pub_class, sizeof(pub_class)},
     {CKA_LABEL, pub_label, strlen(pub_label)},
   };
-  CK_ATTRIBUTE values[] = {
+  CK_ATTRIBUTE values[1] = {
     {CKA_VALUE, buffer, *buffer_len},
   };
 
@@ -675,7 +677,7 @@ int test_encrypt(char* password) {
   CHECK_RV(C_GetFunctionList(&functions), "C_GetFunctionList");
   CHECK_RV(functions->C_GetSlotList(TRUE, slots, &num_slots), "C_GetSlotList");
   CHECK_RV(functions->C_OpenSession(slots[slot], CKF_RW_SESSION|CKF_SERIAL_SESSION, NULL_PTR, (CK_NOTIFY) NULL_PTR, &session), "C_OpenSession");
-  CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
+  CHECK_RV(functions->C_Login(session, CKU_USER, (unsigned char*) password, strlen(password)), "C_Login");
 
   read_auth_certificate(functions, session, certificate, &certificate_len);
   p = certificate;
@@ -819,7 +821,7 @@ void search_for_test(unsigned char* tests_run, char* name) {
   } else {
     // search using the name of the test
     for (int idx = 1; idx < sizeof(tests) / sizeof(dnie_test); idx++) {
-      if (strncmp(tests[idx].name, name, sizeof(tests[idx].name)) == 0) {
+      if (strncmp(tests[idx].name, name, strlen(tests[idx].name)+1) == 0) {
         tests_run[idx] = 1;
         return;
       }
