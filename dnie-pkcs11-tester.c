@@ -25,6 +25,7 @@
 #include <getopt.h>
 #include <sys/wait.h>
 #include <openssl/x509.h>
+#include <dlfcn.h>
 
 #define KWHT  "\x1B[37m"
 #define KRED  "\x1B[31m"
@@ -44,6 +45,10 @@ typedef struct {
 
 int slot = -1;
 int use_cert_names = 1;
+void* pkcs11_handle = NULL;
+CK_C_Initialize C_Initialize_handle = NULL;
+CK_C_Finalize C_Finalize_handle = NULL;
+CK_C_GetFunctionList C_GetFunctionList_handle = NULL;
 
 /* HELPER FUNCTIONS */
 
@@ -242,6 +247,32 @@ void request_password(char* password, int password_len) {
   }
 }
 
+void load_pkcs11(char* path) {
+  void* pkcs11_handle = dlopen(path, RTLD_NOW);
+  if (!pkcs11_handle) {
+    error(0, "Invalid pkcs#11 library %s. Error: %s.", path, dlerror());
+    exit(1);
+  }
+
+  C_Initialize_handle = (CK_C_Initialize) dlsym(pkcs11_handle, "C_Initialize");
+  if (!C_Initialize_handle) {
+    error(0, "Error loading C_Initialize function: %s", dlerror());
+    exit(1);
+  }
+
+  C_Finalize_handle = (CK_C_Finalize) dlsym(pkcs11_handle, "C_Finalize");
+  if (!C_Finalize_handle) {
+    error(0, "Error loading C_Finalize function: %s", dlerror());
+    exit(1);
+  }
+
+  C_GetFunctionList_handle = (CK_C_GetFunctionList) dlsym(pkcs11_handle, "C_GetFunctionList");
+  if (!C_GetFunctionList_handle) {
+    error(0, "Error loading C_GetFunctionList function: %s", dlerror());
+    exit(1);
+  }
+}
+
 /* TESTS */
 
 int test_dnie_inserted(char *password) {
@@ -251,8 +282,8 @@ int test_dnie_inserted(char *password) {
   CK_SLOT_ID slots[128];
   CK_TOKEN_INFO info_token;
 
-  CHECK_RV(C_Initialize(NULL_PTR), "C_Initialize");
-  CHECK_RV(C_GetFunctionList(&functions), "C_GetFunctionList");
+  CHECK_RV(C_Initialize_handle(NULL_PTR), "C_Initialize");
+  CHECK_RV(C_GetFunctionList_handle(&functions), "C_GetFunctionList");
   CHECK_RV(functions->C_GetSlotList(TRUE, NULL_PTR, &num_slots), "C_GetSlotList");
   if (num_slots == 0) {
     error(0, "No slots available in the system");
@@ -279,7 +310,7 @@ int test_dnie_inserted(char *password) {
       break;
     }
   }
-  C_Finalize(NULL_PTR);
+  C_Finalize_handle(NULL_PTR);
   if (slot != -1) {
       message(0, "  Found DNIe at slot %d", slot);
       return 0;
@@ -296,8 +327,8 @@ int test_login(char* password) {
   CK_SESSION_HANDLE session;
   CK_SESSION_INFO info_session;
 
-  CHECK_RV(C_Initialize(NULL_PTR), "C_Initialize");
-  CHECK_RV(C_GetFunctionList(&functions), "C_GetFunctionList");
+  CHECK_RV(C_Initialize_handle(NULL_PTR), "C_Initialize");
+  CHECK_RV(C_GetFunctionList_handle(&functions), "C_GetFunctionList");
   CHECK_RV(functions->C_GetSlotList(TRUE, slots, &num_slots), "C_GetSlotList");
   CHECK_RV(functions->C_OpenSession(slots[slot], CKF_RW_SESSION|CKF_SERIAL_SESSION, NULL_PTR, (CK_NOTIFY) NULL_PTR, &session), "C_OpenSession");
   CHECK_RV(functions->C_GetSessionInfo(session, &info_session), "C_GetSessionInfo");
@@ -307,7 +338,7 @@ int test_login(char* password) {
   message(0, "  Session status: %s", log_session_info_state(info_session.state));
   CHECK_RV(functions->C_Logout(session), "C_Logout");
   CHECK_RV(functions->C_CloseSession(session), "C_CloseSession");
-  C_Finalize(NULL_PTR);
+  C_Finalize_handle(NULL_PTR);
   if (info_session.state != CKS_RW_USER_FUNCTIONS) {
     error(0, "Invalid session state");
     return 1;
@@ -322,8 +353,8 @@ int test_logout(char* password) {
   CK_SESSION_HANDLE session;
   CK_SESSION_INFO info_session;
 
-  CHECK_RV(C_Initialize(NULL_PTR), "C_Initialize");
-  CHECK_RV(C_GetFunctionList(&functions), "C_GetFunctionList");
+  CHECK_RV(C_Initialize_handle(NULL_PTR), "C_Initialize");
+  CHECK_RV(C_GetFunctionList_handle(&functions), "C_GetFunctionList");
   CHECK_RV(functions->C_GetSlotList(TRUE, slots, &num_slots), "C_GetSlotList");
   CHECK_RV(functions->C_OpenSession(slots[slot], CKF_RW_SESSION|CKF_SERIAL_SESSION, NULL_PTR, (CK_NOTIFY) NULL_PTR, &session), "C_OpenSession");
   CHECK_RV(functions->C_GetSessionInfo(session, &info_session), "C_GetSessionInfo");
@@ -343,7 +374,7 @@ int test_logout(char* password) {
   CHECK_RV(functions->C_Logout(session), "C_Logout");
   CHECK_RV(functions->C_CloseSession(session), "C_CloseSession");
 
-  C_Finalize(NULL_PTR);
+  C_Finalize_handle(NULL_PTR);
   if (info_session.state != CKS_RW_USER_FUNCTIONS) {
     error(0, "Invalid session state");
     return 1;
@@ -411,8 +442,8 @@ int test_objects(char* password) {
   int found_auth_priv = 0, found_sign_priv = 0, found_auth_pub = 0, found_sign_pub = 0,
     found_auth_cert = 0, found_sign_cert = 0;
 
-  CHECK_RV(C_Initialize(NULL_PTR), "C_Initialize");
-  CHECK_RV(C_GetFunctionList(&functions), "C_GetFunctionList");
+  CHECK_RV(C_Initialize_handle(NULL_PTR), "C_Initialize");
+  CHECK_RV(C_GetFunctionList_handle(&functions), "C_GetFunctionList");
   CHECK_RV(functions->C_GetSlotList(TRUE, slots, &num_slots), "C_GetSlotList");
   CHECK_RV(functions->C_OpenSession(slots[slot], CKF_RW_SESSION|CKF_SERIAL_SESSION, NULL_PTR, (CK_NOTIFY) NULL_PTR, &session), "C_OpenSession");
   CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
@@ -460,7 +491,7 @@ int test_objects(char* password) {
   CHECK_RV(functions->C_FindObjectsFinal(session), "C_FindObjectsFinal");
   CHECK_RV(functions->C_Logout(session), "C_Logout");
   CHECK_RV(functions->C_CloseSession(session), "C_CloseSession");
-  C_Finalize(NULL_PTR);
+  C_Finalize_handle(NULL_PTR);
   if (!found_sign_priv || !found_sign_pub || !found_sign_cert ||
     !found_auth_priv || !found_auth_pub || !found_auth_cert) {
     error(0, "Some object is not found in the DNIe");
@@ -504,8 +535,8 @@ int test_sign_internal(char* password, int times, char* priv_label, char* pub_la
     message(print_pid, "  Starting the login and sign process");
   }
 
-  CHECK_RV(C_Initialize(NULL_PTR), "C_Initialize");
-  CHECK_RV(C_GetFunctionList(&functions), "C_GetFunctionList");
+  CHECK_RV(C_Initialize_handle(NULL_PTR), "C_Initialize");
+  CHECK_RV(C_GetFunctionList_handle(&functions), "C_GetFunctionList");
   CHECK_RV(functions->C_GetSlotList(TRUE, slots, &num_slots), "C_GetSlotList");
   CHECK_RV(functions->C_OpenSession(slots[slot], CKF_RW_SESSION|CKF_SERIAL_SESSION, NULL_PTR, (CK_NOTIFY) NULL_PTR, &session), "C_OpenSession");
   CHECK_RV(functions->C_Login(session, CKU_USER, password, strlen(password)), "C_Login");
@@ -552,7 +583,7 @@ int test_sign_internal(char* password, int times, char* priv_label, char* pub_la
 
   CHECK_RV(functions->C_Logout(session), "C_Logout");
   CHECK_RV(functions->C_CloseSession(session), "C_CloseSession");
-  C_Finalize(NULL_PTR);
+  C_Finalize_handle(NULL_PTR);
   if (!ok) {
     return 1;
   }
@@ -755,7 +786,11 @@ void usage(const char* format, ...) {
   vprintf(format, arglist);
   va_end(arglist);
   printf("%s\n", KNRM);
-  message(0, "  Usage: dnie-pkcs11-tester {OPTIONS}");
+  message(0, "");
+  message(0, "  Usage: dnie-pkcs11-tester [OPTIONS] pkcs11-lib.so");
+  message(0, "");
+  message(0, "  ARGUMENTS:");
+  message(0, "    pkcs11-lib.so: PKCS#11 library to test.");
   message(0, "");
   message(0, "  OPTIONS:");
   message(0, "    --test=TEST -t TEST: Executes the test TEST (order or name of the test).");
@@ -826,6 +861,11 @@ int main(int argc, char *argv[]) {
       case '?': usage("");
     }
   }
+
+  if (optind + 1 != argc) {
+      usage("Invalid number of arguments. Only the PKCS#11 library is needed.");
+  }
+  load_pkcs11(argv[optind]);
 
   request_password(password, 128);
   for (int i = 0; i < sizeof(tests) / sizeof(dnie_test); i++) {
