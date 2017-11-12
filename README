@@ -46,7 +46,7 @@ Finally the current status of the tests which are executed is the following:
          description: Performs two sequential signatures with the auth key.
          default: yes
      6.- name: interference
-         description: Executes two processes in that way that one steals the secure channel of the other after the login, some sleeps are used for that, this test is 60 seconds in length.
+         description: Executes two processes in a way that one steals the secure channel of the other after the login, some sleeps are used for that, this test is 60 seconds in length.
          default: yes
      7.- name: auth-11
          description: Executes 11 signatures with the auth key. OpenSC has a default pin cache of 10 uses, DNIe v3.0 needs more.

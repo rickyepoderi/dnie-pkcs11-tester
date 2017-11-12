@@ -21,7 +21,7 @@ AC_SEARCH_LIBS([dlopen], [dl dld], [], [
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([stdlib.h string.h termios.h unistd.h stdio.h stdarg.h getopt.h sys/wait.h dlfcn.h])
+AC_CHECK_HEADERS([stdlib.h string.h termios.h unistd.h stdio.h stdarg.h getopt.h openssl/x509.h sys/wait.h dlfcn.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL

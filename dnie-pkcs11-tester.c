@@ -249,7 +249,7 @@ void request_password(char* password, int password_len) {
 }
 
 void load_pkcs11(char* path) {
-  void* pkcs11_handle = dlopen(path, RTLD_NOW);
+  pkcs11_handle = dlopen(path, RTLD_NOW);
   if (!pkcs11_handle) {
     error(0, "Invalid pkcs#11 library %s. Error: %s.", path, dlerror());
     exit(1);
@@ -767,7 +767,7 @@ dnie_test tests[] = {
   },
   {
     .name = "interference",
-    .description = "Executes two processes in that way that one steals the secure channel of the other after the login, some sleeps are used for that, this test is 60 seconds in length.",
+    .description = "Executes two processes in a way that one steals the secure channel of the other after the login, some sleeps are used for that, this test is 60 seconds in length.",
     .test = test_process_interference,
     .is_default = 1,
   },
