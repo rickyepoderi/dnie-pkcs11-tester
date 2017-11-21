@@ -29,16 +29,16 @@ if test "x$ac_cv_use_ssl" != xno; then
     AC_PATH_TOOL([PKGCONFIG], [pkg-config], [no], [$PATH:/usr/bin:/usr/local/bin])
     itexists=`PKG_CONFIG_LIBDIR=$OPENSSL_PCDIR $PKGCONFIG --exists libcrypto >/dev/null 2>&1 && echo 1`
     if test -z "$itexists"; then
-        CRYTO_LDFLAGS="-L$ac_cv_use_ssl/lib"
-        CRYTO_CPPFLAGS="-I$ac_cv_use_ssl/include"
-        AC_MSG_NOTICE([No pkg-config information found. Using hardcoded $CRYTO_CPPFLAGS and $CRYTO_LDFLAGS])
+        CRYPTO_LDFLAGS="-L$ac_cv_use_ssl/lib"
+        CRYPTO_CPPFLAGS="-I$ac_cv_use_ssl/include"
+        AC_MSG_NOTICE([No pkg-config information found. Using hardcoded $CRYPTO_CPPFLAGS and $CRYPTO_LDFLAGS])
     else
-        CRYTO_LDFLAGS=`PKG_CONFIG_LIBDIR=$OPENSSL_PCDIR $PKGCONFIG --libs-only-L libcrypto 2>/dev/null`
-        CRYTO_CPPFLAGS=`PKG_CONFIG_LIBDIR=$OPENSSL_PCDIR $PKGCONFIG --cflags-only-I libcrypto 2>/dev/null`
-        AC_MSG_NOTICE([pkg-config information found. Using returned $CRYTO_CPPFLAGS and $CRYTO_LDFLAGS])
+        CRYPTO_LDFLAGS=`PKG_CONFIG_LIBDIR=$OPENSSL_PCDIR $PKGCONFIG --libs-only-L libcrypto 2>/dev/null`
+        CRYPTO_CPPFLAGS=`PKG_CONFIG_LIBDIR=$OPENSSL_PCDIR $PKGCONFIG --cflags-only-I libcrypto 2>/dev/null`
+        AC_MSG_NOTICE([pkg-config information found. Using returned $CRYPTO_CPPFLAGS and $CRYPTO_LDFLAGS])
     fi
     LDFLAGS="$LDFLAGS $CRYPTO_LDFLAGS"
-    CPPFLAGS="$CPPFLAGS $CRYTO_CPPFLAGS"
+    CPPFLAGS="$CPPFLAGS $CRYPTO_CPPFLAGS"
 fi
 AC_CHECK_LIB([crypto], [d2i_X509], [], [AC_MSG_FAILURE([could not find crypto])])
 
