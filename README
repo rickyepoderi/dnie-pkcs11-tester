@@ -8,7 +8,11 @@ The auto-tools can be used for compilng it.
     ./configure
     make
 
-This creates a _dnie-pkcs11-tester_ in the current directory you can execute.
+This creates a _dnie-pkcs11-tester_ in the current directory you can execute. If you need to use a custom openssl location (cryto library is used to show the certificates inside the card) you can specify it using the --with-ssl option.
+
+    autoreconf -iv
+    ./configure --with-ssl=/path/to/openssl
+    make
 
 If you want you can compile by yourself (maybe it is easier) just execute a command like this:
 
