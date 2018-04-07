@@ -855,6 +855,8 @@ int main(int argc, char *argv[]) {
     {0, 0, 0, 0}
   };
 
+  memset (tests_run, 0, sizeof(tests_run));
+
   while ((c = getopt_long(argc, argv, "aht:", long_options, NULL)) != -1) {
     switch (c) {
       case 'a': all_flag = 1; break;
