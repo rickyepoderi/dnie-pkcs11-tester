@@ -307,7 +307,7 @@ int test_dnie_inserted(char *password) {
       break;
     } else if (strstr((char*) info_token.label, "DNI electrónico") != NULL) {
       slot = i;
-      use_cert_names = 0;
+      use_cert_names = 1;
       break;
     }
   }
@@ -384,7 +384,7 @@ int test_logout(char* password) {
 }
 
 #define MAX_OBJECTS 128
-#define MAX_BUFFER_SIZE 2048
+#define MAX_BUFFER_SIZE 4096
 
 int read_private_always_authenticate(CK_FUNCTION_LIST_PTR functions, CK_SESSION_HANDLE session, CK_OBJECT_HANDLE object) {
   CK_BBOOL always_auth = FALSE;
@@ -454,7 +454,7 @@ int test_objects(char* password) {
   message(0, "  Found %d objects in the DNIe", num_objects);
   for (i = 0; i < num_objects; i++) {
     values[0].ulValueLen = MAX_BUFFER_SIZE;
-    CHECK_RV(functions->C_GetAttributeValue(session, vector_object[i], values, 2), "C_GetAttributeValue");
+    CHECK_RV(functions->C_GetAttributeValue(session, vector_object[i], values, 2), "C_GetAttributeValue 2");
     ((char*)values[0].pValue)[values[0].ulValueLen] = '\0';
     message(0, "  %d.- %x: %s, %s", i, vector_object[i], (char*)values[0].pValue, 
       class_to_string(*((CK_OBJECT_CLASS*) values[1].pValue)));
@@ -481,11 +481,13 @@ int test_objects(char* password) {
     } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_CERTIFICATE &&
         strcmp("CertAutenticacion", (char*)values[0].pValue) == 0) {
       message(0, "  Found the authentication certificate");
+      certificate_len = MAX_BUFFER_SIZE;
       read_certificate_value(functions, session, vector_object[i], certificate, &certificate_len);
       found_auth_cert = 1;
     } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_CERTIFICATE &&
         strcmp("CertFirmaDigital", (char*)values[0].pValue) == 0) {
       message(0, "  Found the signing certificate");
+      certificate_len = MAX_BUFFER_SIZE;
       read_certificate_value(functions, session, vector_object[i], certificate, &certificate_len);
       found_sign_cert = 1;
     }
@@ -566,7 +568,7 @@ int test_sign_internal(char* password, int times, char* priv_label, char* pub_la
       CHECK_RV(functions->C_Sign(session, (unsigned char*) data, strlen(data) + 1, signature, &signature_len), "C_Sign");
       message(print_pid, "  Signature %d done successfully", i + 1);
     } else {
-      error(print_pid, "No private key found");
+      error(print_pid, "No private key found (found %d)", num_objects);
     }
     CHECK_RV(functions->C_FindObjectsFinal(session), "C_FindObjectsFinal");
 
@@ -578,7 +580,7 @@ int test_sign_internal(char* password, int times, char* priv_label, char* pub_la
       message(print_pid, "  Verification %d done successfully", i + 1);
       ok = 1;
     } else {
-      error(print_pid, "No public key found");
+      error(print_pid, "No public key found (found %d)", num_objects);
     }
     CHECK_RV(functions->C_FindObjectsFinal(session), "C_FindObjectsFinal");
   }
