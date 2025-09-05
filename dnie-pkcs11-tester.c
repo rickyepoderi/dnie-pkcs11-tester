@@ -454,42 +454,46 @@ int test_objects(char* password) {
   message(0, "  Found %d objects in the DNIe", num_objects);
   for (i = 0; i < num_objects; i++) {
     values[0].ulValueLen = MAX_BUFFER_SIZE;
-    CHECK_RV(functions->C_GetAttributeValue(session, vector_object[i], values, 2), "C_GetAttributeValue 2");
-    ((char*)values[0].pValue)[values[0].ulValueLen] = '\0';
-    message(0, "  %d.- %x: %s, %s", i, vector_object[i], (char*)values[0].pValue, 
-      class_to_string(*((CK_OBJECT_CLASS*) values[1].pValue)));
-    if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PRIVATE_KEY &&
-        strcmp("KprivAutenticacion", (char*)values[0].pValue) == 0) {
-      message(0, "  Found the authentication private key CKA_ALWAYS_AUTHENTICATE=%d",
-        read_private_always_authenticate(functions, session, vector_object[i]));
-      found_auth_priv = 1;
-    } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PRIVATE_KEY &&
-        strcmp("KprivFirmaDigital", (char*)values[0].pValue) == 0) {
-      message(0, "  Found the signing private key CKA_ALWAYS_AUTHENTICATE=%d",
-        read_private_always_authenticate(functions, session, vector_object[i]));
-      found_sign_priv = 1;
-    } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PUBLIC_KEY &&
-        (strcmp("CertAutenticacion", (char*)values[0].pValue) == 0 ||
-         strcmp("KpuAutenticacion", (char*)values[0].pValue) == 0)) {
-      message(0, "  Found the authentication public key");
-      found_auth_pub = 1;
-    } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PUBLIC_KEY &&
-        (strcmp("CertFirmaDigital", (char*)values[0].pValue) == 0 ||
-         strcmp("KpuFirmaDigital", (char*)values[0].pValue) == 0)) {
-      message(0, "  Found the signing public key");
-      found_sign_pub = 1;
-    } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_CERTIFICATE &&
-        strcmp("CertAutenticacion", (char*)values[0].pValue) == 0) {
-      message(0, "  Found the authentication certificate");
-      certificate_len = MAX_BUFFER_SIZE;
-      read_certificate_value(functions, session, vector_object[i], certificate, &certificate_len);
-      found_auth_cert = 1;
-    } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_CERTIFICATE &&
-        strcmp("CertFirmaDigital", (char*)values[0].pValue) == 0) {
-      message(0, "  Found the signing certificate");
-      certificate_len = MAX_BUFFER_SIZE;
-      read_certificate_value(functions, session, vector_object[i], certificate, &certificate_len);
-      found_sign_cert = 1;
+    if (functions->C_GetAttributeValue(session, vector_object[i], values, 2) == CKR_OK) {
+      ((char*)values[0].pValue)[values[0].ulValueLen] = '\0';
+      message(0, "  %d.- %x: %s, %s", i, vector_object[i], (char*)values[0].pValue, 
+        class_to_string(*((CK_OBJECT_CLASS*) values[1].pValue)));
+      if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PRIVATE_KEY &&
+          strcmp("KprivAutenticacion", (char*)values[0].pValue) == 0) {
+        message(0, "  Found the authentication private key CKA_ALWAYS_AUTHENTICATE=%d",
+          read_private_always_authenticate(functions, session, vector_object[i]));
+        found_auth_priv = 1;
+      } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PRIVATE_KEY &&
+          strcmp("KprivFirmaDigital", (char*)values[0].pValue) == 0) {
+        message(0, "  Found the signing private key CKA_ALWAYS_AUTHENTICATE=%d",
+          read_private_always_authenticate(functions, session, vector_object[i]));
+        found_sign_priv = 1;
+      } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PUBLIC_KEY &&
+          (strcmp("CertAutenticacion", (char*)values[0].pValue) == 0 ||
+           strcmp("KpuAutenticacion", (char*)values[0].pValue) == 0)) {
+        message(0, "  Found the authentication public key");
+        found_auth_pub = 1;
+      } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_PUBLIC_KEY &&
+          (strcmp("CertFirmaDigital", (char*)values[0].pValue) == 0 ||
+           strcmp("KpuFirmaDigital", (char*)values[0].pValue) == 0)) {
+        message(0, "  Found the signing public key");
+        found_sign_pub = 1;
+      } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_CERTIFICATE &&
+          strcmp("CertAutenticacion", (char*)values[0].pValue) == 0) {
+        message(0, "  Found the authentication certificate");
+        certificate_len = MAX_BUFFER_SIZE;
+        read_certificate_value(functions, session, vector_object[i], certificate, &certificate_len);
+        found_auth_cert = 1;
+      } else if (*((CK_OBJECT_CLASS*) values[1].pValue) == CKO_CERTIFICATE &&
+          strcmp("CertFirmaDigital", (char*)values[0].pValue) == 0) {
+        message(0, "  Found the signing certificate");
+        certificate_len = MAX_BUFFER_SIZE;
+        read_certificate_value(functions, session, vector_object[i], certificate, &certificate_len);
+        found_sign_cert = 1;
+      }
+    } else {
+      // object without label or class, just report as unknown
+      message(0, "  %d.- unknown", i);
     }
   }
   CHECK_RV(functions->C_FindObjectsFinal(session), "C_FindObjectsFinal");
