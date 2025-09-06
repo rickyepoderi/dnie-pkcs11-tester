@@ -8,7 +8,7 @@ AM_INIT_AUTOMAKE
 AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
-AC_PROG_CC_C99
+AC_PROG_CC
 
 # Use the C language and compiler for the following checks
 AC_LANG([C])
@@ -20,12 +20,12 @@ AC_SEARCH_LIBS([dlopen], [dl dld], [], [
 
 # Checks for crypto
 AC_ARG_WITH([ssl],
-             AC_HELP_STRING([--with-ssl],
+             AS_HELP_STRING([--with-ssl],
                             [Specify custom path for openssl libraries (default auto-detect)]),
              [ac_cv_use_ssl=$withval], [ac_cv_use_ssl=no])
 if test "x$ac_cv_use_ssl" != xno; then
     AC_MSG_NOTICE([Using custom openssl information...])
-    OPENSSL_PCDIR="$ac_cv_use_ssl/lib/pkgconfig"
+    OPENSSL_PCDIR="$ac_cv_use_ssl:$ac_cv_use_ssl/lib/pkgconfig"
     AC_PATH_TOOL([PKGCONFIG], [pkg-config], [no], [$PATH:/usr/bin:/usr/local/bin])
     itexists=`PKG_CONFIG_LIBDIR=$OPENSSL_PCDIR $PKGCONFIG --exists libcrypto >/dev/null 2>&1 && echo 1`
     if test -z "$itexists"; then
@@ -43,7 +43,7 @@ fi
 AC_CHECK_LIB([crypto], [d2i_X509], [], [AC_MSG_FAILURE([could not find crypto])])
 
 # Checks for header files.
-AC_HEADER_STDC
+AC_INCLUDES_DEFAULT
 AC_CHECK_HEADERS([stdlib.h string.h termios.h unistd.h stdio.h stdarg.h getopt.h openssl/x509.h sys/wait.h dlfcn.h],
                  [],[AC_MSG_FAILURE([could not find include files])])
 
